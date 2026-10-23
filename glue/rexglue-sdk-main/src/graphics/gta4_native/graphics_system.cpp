@@ -3877,6 +3877,32 @@ ui::vulkan::VulkanDeviceRequirements NativeDeviceRequirements() {
   return requirements;
 }
 
+// The player cannot act on "Vulkan device creation failed". Say which
+// feature the GPU is missing, in words, so the launcher can show it.
+std::string DescribeDeviceRequirement(const std::string& requirement) {
+  if (requirement == "vulkan_1_2") {
+    return "this device's GPU driver does not support Vulkan 1.2, which this game's renderer "
+           "requires";
+  }
+  if (requirement == "shaderInt64") {
+    return "this device's GPU does not support 64-bit integers in shaders (shaderInt64), which "
+           "this game's renderer requires";
+  }
+  if (requirement == "depthClamp") {
+    return "this device's GPU does not support depth clamping (depthClamp), which this game's "
+           "renderer requires";
+  }
+  if (requirement == "sampleRateShading") {
+    return "this device's GPU does not support per-sample shading (sampleRateShading), which this "
+           "game's renderer requires";
+  }
+  if (requirement == "independentBlend") {
+    return "this device's GPU does not support per-target blend states (independentBlend), which "
+           "this game's renderer requires";
+  }
+  return {};
+}
+
 }  // namespace
 
 X_STATUS Gta4NativeGraphicsSystem::SetupPresentation(ui::WindowedAppContext* app_context) {
@@ -3891,6 +3917,11 @@ X_STATUS Gta4NativeGraphicsSystem::SetupPresentation(ui::WindowedAppContext* app
     provider_ = ui::vulkan::VulkanProvider::Create(false, true, true, true, &requirements);
   }
   if (!provider_) {
+    last_setup_failure_ =
+        DescribeDeviceRequirement(ui::vulkan::LastDeviceRequirementFailure());
+    if (last_setup_failure_.empty()) {
+      last_setup_failure_ = "this device's GPU could not start the game's Vulkan renderer";
+    }
     return X_STATUS_UNSUCCESSFUL;
   }
   ConfigureDxtDecoding(
@@ -3925,6 +3956,11 @@ X_STATUS Gta4NativeGraphicsSystem::SetupGuestGpu(runtime::FunctionDispatcher* fu
     provider_ = ui::vulkan::VulkanProvider::Create(false, false, true, true, &requirements);
     if (!provider_) {
       memory_ = nullptr;
+      last_setup_failure_ =
+          DescribeDeviceRequirement(ui::vulkan::LastDeviceRequirementFailure());
+      if (last_setup_failure_.empty()) {
+        last_setup_failure_ = "this device's GPU could not start the game's Vulkan renderer";
+      }
       return X_STATUS_UNSUCCESSFUL;
     }
     ConfigureDxtDecoding(
